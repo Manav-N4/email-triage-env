@@ -9,9 +9,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from openenv.core.env_server import create_app
 from server.email_environment import EmailTriageEnvironment
+from models import EmailAction, EmailObservation
 
 app = create_app(
-    env_class=EmailTriageEnvironment,
+    env=EmailTriageEnvironment,
+    action_cls=EmailAction,
+    observation_cls=EmailObservation,
     max_concurrent_envs=50,
-    enable_web_interface=True,
 )
