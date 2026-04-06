@@ -5,6 +5,7 @@ the /health endpoint, and the Gradio web UI automatically.
 """
 
 import sys, os
+import uvicorn
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from openenv.core.env_server import create_app
@@ -20,3 +21,12 @@ app = create_app(
     env_name="email-triage-env",
     max_concurrent_envs=50,
 )
+
+
+def main():
+    """Main entry point for the server CLI."""
+    uvicorn.run("server.app:app", host="0.0.0.0", port=7860, reload=True)
+
+
+if __name__ == "__main__":
+    main()

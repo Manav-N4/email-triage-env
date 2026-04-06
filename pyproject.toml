@@ -22,6 +22,9 @@ dependencies = [
     "requests"
 ]
 
+[project.scripts]
+server = "server.app:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["server*", "models*", "client*"]
