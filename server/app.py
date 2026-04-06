@@ -8,7 +8,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from openenv.core.env_server import create_app
-from email_environment import EmailTriageEnvironment
+from server.email_environment import EmailTriageEnvironment
 
 app = create_app(
     env_class=EmailTriageEnvironment,
