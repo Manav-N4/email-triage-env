@@ -11,9 +11,12 @@ from openenv.core.env_server import create_app
 from server.email_environment import EmailTriageEnvironment
 from models import EmailAction, EmailObservation
 
+os.environ["ENABLE_WEB_INTERFACE"] = "true"
+
 app = create_app(
     env=EmailTriageEnvironment,
     action_cls=EmailAction,
     observation_cls=EmailObservation,
+    env_name="email-triage-env",
     max_concurrent_envs=50,
 )
