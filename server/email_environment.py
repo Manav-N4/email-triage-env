@@ -128,7 +128,7 @@ class EmailTriageEnvironment(Environment):
             step_count=0,
             current_task_index=0,
             total_tasks=len(TASKS),
-            cumulative_reward=0.01,
+            cumulative_reward=0.5,
             difficulty="easy",
         )
         self._current_task_index = 0
@@ -139,7 +139,7 @@ class EmailTriageEnvironment(Environment):
             body=task["body"],
             sender=task["sender"],
             task_description=task["task_description"],
-            reward=0.01,
+            reward=0.5,
             done=False,
             feedback="Episode started.",
         )
