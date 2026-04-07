@@ -25,7 +25,7 @@ app = create_app(
 
 def main():
     """Main entry point for the server CLI."""
-    uvicorn.run("server.app:app", host="0.0.0.0", port=7860, reload=True)
+    uvicorn.run("server.app:app", host="0.0.0.0", port=7860, reload=False)
 
 
 if __name__ == "__main__":

@@ -136,7 +136,17 @@ def main():
         api_key=HF_TOKEN,
     )
 
-    run_episode(llm_client)
+    # Added robust error handling & retries to prevent unhandled exceptions
+    for attempt in range(3):
+        try:
+            run_episode(llm_client)
+            break
+        except Exception as e:
+            print(f"ERROR: Inference attempt {attempt+1} failed: {e}", file=sys.stderr)
+            if attempt < 2:
+                time.sleep(5) # Wait for server to stabilize
+            else:
+                sys.exit(1)
 
 
 if __name__ == "__main__":
