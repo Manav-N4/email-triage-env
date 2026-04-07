@@ -156,11 +156,18 @@ def grade_reply(action: EmailAction, task: dict) -> tuple[float, str]:
 
 def compute_reward(action: EmailAction, task: dict) -> tuple[float, dict, str]:
     """
-    Returns (total_reward 0.0-1.0, score_breakdown, feedback_string).
+    Returns (total_reward strictly within (0, 1), score_breakdown, feedback_string).
     """
     p_score, p_fb = grade_priority(action, task)
     r_score, r_fb = grade_reply(action, task)
-    total = round(p_score + r_score, 3)
+    
+    # Raw total is in [0.0, 1.0]
+    raw_total = p_score + r_score
+    
+    # HACKATHON REQUIREMENT: Reward must be strictly > 0 and < 1.
+    # We clip to [0.01, 0.99] to ensure we never hit 0.0 or 1.0.
+    total = round(min(max(raw_total, 0.01), 0.99), 3)
+    
     breakdown = {
         "priority_score": p_score,
         "reply_score": r_score,
