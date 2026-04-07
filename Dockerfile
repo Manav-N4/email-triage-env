@@ -1,4 +1,5 @@
-FROM python:3.11-bullseye
+# Pull from AWS ECR Public to bypass Docker Hub registry glitches
+FROM public.ecr.aws/docker/library/python:3.11-slim
 
 WORKDIR /app
 
