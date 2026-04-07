@@ -91,7 +91,7 @@ def run_task(llm_client: OpenAI, task_id: str) -> None:
             "reply_words": len(action.reply_draft.split()),
         })
         print(f"[STEP] task_id={obs.email_id} action={action_log} reward={reward:.4f} done={done}", flush=True)
-        print(f"[END] task_id={obs.email_id} total_reward={reward:.4f} steps=1", flush=True)
+        print(f"[END] task_id={obs.email_id} total_reward={state.cumulative_reward:.4f} steps=1", flush=True)
 
 
 def main():
