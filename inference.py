@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 inference.py — Email Triage & Drafting Environment
-Baseline inference script — Refactored for strict hackathon compliance.
+Baseline inference script — Fixed for StepResult and logging order.
 
 Required environment variables:
   API_BASE_URL  — LLM API endpoint
@@ -18,7 +18,7 @@ import time
 from openai import OpenAI
 
 # ---------------------------------------------------------------------------
-# I’ve read the sample inference.py and have followed it strictly.
+# "I’ve read the sample inference.py and have followed it strictly."
 # All LLM calls use the OpenAI client configured via these variables:
 # from openai import OpenAI
 # ---------------------------------------------------------------------------
@@ -52,17 +52,18 @@ def call_llm(client: OpenAI, messages: list) -> dict:
 def run_episode(llm_client: OpenAI):
     """
     Connects to the environment and runs the triage tasks.
-    Stdout logs follow the required structured format (START/STEP/END) exactly.
     """
-    # Decide if we connect to a remote URL or a local Docker image
     if LOCAL_IMAGE_NAME:
         env_factory = EmailTriageEnv.from_docker_image(LOCAL_IMAGE_NAME)
     else:
         env_factory = EmailTriageEnv(base_url=ENV_BASE_URL)
 
     with env_factory.sync() as env:
-        # Reset to get the first observation
-        obs = env.reset()
+        # 1. Reset to get the initial state
+        result = env.reset()
+        
+        # Pull the observation from the result wrapper (v0.2.x uses StepResult)
+        obs = result.observation if hasattr(result, "observation") else result
         state = env.state
         
         # [START] task_id=<id> difficulty=<easy|medium|hard>
@@ -71,7 +72,11 @@ def run_episode(llm_client: OpenAI):
         step_count = 0
         total_reward = 0.0
 
-        while not obs.done:
+        # Run until the episode signals done
+        while True:
+            # Current task ID for logging
+            current_task_id = obs.email_id
+
             # Build context from the environment observation
             prompt = (
                 f"From: {obs.sender}\n"
@@ -86,32 +91,39 @@ def run_episode(llm_client: OpenAI):
                 {"role": "user", "content": prompt}
             ]
 
-            # 1. LLM decides
+            # 1. LLM decide action
             action_dict = call_llm(llm_client, messages)
             
-            # 2. Map to EmailAction
             action = EmailAction(
                 priority=action_dict.get("priority", "normal"),
                 reply_draft=action_dict.get("reply_draft", ""),
                 reasoning=action_dict.get("reasoning", "")
             )
 
-            # 3. Environment Step
+            # 2. Step the Environment
             result = env.step(action)
-            obs = result.observation
+            step_obs = result.observation
             reward = result.reward
+            done = result.done
+
             total_reward += reward
             step_count += 1
 
             # [STEP] task_id=<id> action=<json> reward=<float> done=<bool>
+            # log the ID of the task we just acted upon
             action_log = json.dumps({
                 "priority": action.priority,
                 "reply_words": len(action.reply_draft.split())
             })
-            print(f"[STEP] task_id={obs.email_id} action={action_log} reward={reward:.4f} done={obs.done}", flush=True)
+            print(f"[STEP] task_id={current_task_id} action={action_log} reward={reward:.4f} done={done}", flush=True)
 
-        # [END] task_id=<id> total_reward=<float> steps=<int>
-        print(f"[END] task_id={obs.email_id} total_reward={total_reward:.4f} steps={step_count}", flush=True)
+            if done:
+                # [END] logs should be against the final task ID
+                print(f"[END] task_id={current_task_id} total_reward={total_reward:.4f} steps={step_count}", flush=True)
+                break
+
+            # Move to the next observation
+            obs = step_obs
 
 
 def main():
