@@ -64,7 +64,7 @@ def run_episode(llm_client: OpenAI):
         
         # Pull the observation from the result wrapper (v0.2.x uses StepResult)
         obs = result.observation if hasattr(result, "observation") else result
-        state = env.state
+        state = env.state()
         
         # [START] task_id=<id> difficulty=<easy|medium|hard>
         print(f"[START] task_id={obs.email_id} difficulty={state.difficulty}", flush=True)
