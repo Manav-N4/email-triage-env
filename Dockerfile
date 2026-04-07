@@ -1,8 +1,8 @@
-FROM python:3.10-slim
+FROM python:3.11-bullseye
 
 WORKDIR /app
 
-# Install system dependencies
+# Install basic system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
@@ -11,11 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install uv for fast, reliable dependency management
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Copy the dependency files first (better caching)
+# Copy the dependency files
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies using the system-wide python
-# This ensures all our requirements from pyproject.toml are met
+# Install dependencies using system python
 RUN uv pip install --system .
 
 # Copy the rest of the application
@@ -27,5 +26,5 @@ ENV PYTHONPATH=/app
 # Expose the default OpenEnv/Gradio port
 EXPOSE 7860
 
-# Run the server via our standardized main() entry point
+# Run the server
 CMD ["python", "-m", "server.app"]
