@@ -3,15 +3,8 @@ spec_version: 1
 name: email-triage-env
 display_name: "Email Triage & Drafting Environment"
 description: >
-  A real-world OpenEnv environment where an AI agent learns to triage
-  incoming emails by priority (urgent/normal/low) and draft professional
-  replies. Three tasks of increasing difficulty test both classification
-  accuracy and reply quality, with partial reward signals throughout.
-
-type: text
-version: "1.0.0"
-author: "hackathon-submission"
-license: MIT
+  Professional email triage environment for priority classification
+  and high-quality drafting across three complexity levels.
 
 runtime:
   image: Dockerfile
@@ -22,66 +15,28 @@ app:
   framework: fastapi
 
 tasks:
-  - id: task-easy
-    name: "Priority Classification"
+  - id: email-001
+    name: "Incident Classification (Easy)"
     difficulty: easy
-    description: >
-      Classify a clearly urgent internal incident alert email.
-      No reply required. Tests baseline priority recognition.
+    description: "Classify a high-priority server outage alert."
     reward_range: [0.0, 1.0]
 
-  - id: task-medium
-    name: "Client Complaint Response"
+  - id: email-002
+    name: "Client Escalation (Medium)"
     difficulty: medium
-    description: >
-      Classify a frustrated Enterprise client email as urgent and draft
-      a professional, empathetic reply that acknowledges the issue,
-      apologises, and commits to concrete follow-up action.
+    description: "Classify and draft an empathetic reply to a frustrated client."
     reward_range: [0.0, 1.0]
 
-  - id: task-hard
-    name: "Board-level Escalation"
+  - id: email-003
+    name: "Strategic Board Mail (Hard)"
     difficulty: hard
-    description: >
-      Handle a board member raising multiple strategic concerns before a
-      meeting. Must address all 3 concerns individually, maintain an
-      executive tone, propose a meeting time, and avoid over-promising.
+    description: "Classify and draft a nuanced reply to a board member's strategic concerns."
     reward_range: [0.0, 1.0]
-
-observation_space:
-  type: object
-  fields:
-    email_id: string
-    subject: string
-    body: string
-    sender: string
-    task_description: string
-    reward: float
-    done: boolean
-    feedback: string
-    score_breakdown: object
-
-action_space:
-  type: object
-  fields:
-    priority:
-      type: string
-      enum: [urgent, normal, low]
-    reply_draft:
-      type: string
-      description: "Agent's drafted reply to the email (empty string if not required)"
-    reasoning:
-      type: string
-      description: "Optional chain-of-thought (not scored)"
 
 reward:
   range: [0.0, 1.0]
   components:
     - name: priority_score
       weight: 0.4
-      description: "Correct priority classification"
     - name: reply_score
       weight: 0.6
-      description: >
-        Keyword coverage (70%) + reply length (30%).
-        Partial credit awarded — no binary pass/fail.

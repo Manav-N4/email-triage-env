@@ -110,7 +110,7 @@ def main():
 
     # LOOP THROUGH ALL 3 TASKS
     # This ensures exactly 3 START / STEP / END logs are audited by the validator.
-    tasks_to_run = ["task-easy", "task-medium", "task-hard"]
+    tasks_to_run = ["email-001", "email-002", "email-003"]
     
     for tid in tasks_to_run:
         for attempt in range(2):
