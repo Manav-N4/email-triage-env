@@ -92,8 +92,8 @@ class SimpleGrader(Rubric):
                 r_score = (0.7 * keyword_score + 0.3 * length_score) * 0.6
         
         # HACKATHON REQUIREMENT: Reward must be strictly > 0 and < 1.
-        # Clip to (0.01, 0.99)
-        total = round(min(max(p_score + r_score, 0.01), 0.99), 3)
+        # Clip to (0.1, 0.9) for maximum safety in the validator
+        total = round(min(max(p_score + r_score, 0.1), 0.9), 3)
         return total
 
 
@@ -145,9 +145,10 @@ class EmailTriageEnvironment(Environment):
         )
 
     def step(self, action: EmailAction) -> EmailObservation:
-        # Use our concrete grader for the reward
+        # CORRECT: Call the grader like a function to trigger framework hooks (logging, session state, etc.)
+        # This is essential for the validator to 'see' that a grader was executed.
         grader = self.rubric[TASKS[self._current_task_index]["id"]]
-        reward = grader.forward(action, None)
+        reward = grader(action, None)
         
         self._state.step_count += 1
         self._state.cumulative_reward += reward
