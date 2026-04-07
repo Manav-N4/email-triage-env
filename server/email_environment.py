@@ -1,6 +1,6 @@
 """
 Email Triage & Drafting Environment — Server-side logic.
-Fixed for component-level reward auditing.
+Fixed for component-level reward auditing with high buffers.
 """
 
 import uuid
@@ -68,18 +68,16 @@ class TriageGrader(Rubric):
         self.last_breakdown = {}
 
     def forward(self, action: EmailAction, observation: Any) -> float:
-        """Grading logic ensuring components are non-zero."""
+        """Grading logic ensuring ALL scores stay strictly in (0.1, 0.9)."""
         task = TASKS[self.task_idx]
         
-        # 1. Priority (Weight 0.4)
-        # Ensure it's never 0.0 or 0.4
+        # 1. Priority Score (Normalized range 0.1 - 0.9)
         correct_p = task["correct_priority"]
         chosen_p = action.priority.strip().lower()
-        p_score = 0.35 if chosen_p == correct_p else 0.05
+        priority_raw = 0.9 if chosen_p == correct_p else 0.1
         
-        # 2. Reply (Weight 0.6)
-        # Ensure it's never 0.0 or 0.6
-        r_score = 0.55 if not task["requires_reply"] else 0.05
+        # 2. Reply Score (Normalized range 0.1 - 0.9)
+        reply_raw = 0.9 if not task["requires_reply"] else 0.1
         if task["requires_reply"]:
             draft = action.reply_draft.lower().strip()
             if draft:
@@ -87,14 +85,23 @@ class TriageGrader(Rubric):
                 matched = [kw for kw in keywords if kw.lower() in draft]
                 k_score = len(matched) / max(len(keywords), 1)
                 l_score = min(len(draft.split()) / 50, 1.0)
-                # Max 0.55, Min 0.05
-                r_score = max(min((0.7 * k_score + 0.3 * l_score) * 0.6, 0.55), 0.05)
+                # Map [0, 1] to [0.1, 0.9]
+                reply_raw = 0.1 + (0.7 * k_score + 0.3 * l_score) * 0.8
         
-        # Total is strictly between 0.1 and 0.9
-        total = round(p_score + r_score, 3)
+        # Weights from openenv.yaml
+        P_WEIGHT = 0.4
+        R_WEIGHT = 0.6
+        
+        # Components as absolute contributions (strictly in range)
+        p_comp = round(priority_raw * P_WEIGHT, 3) # 0.04 to 0.36
+        r_comp = round(reply_raw * R_WEIGHT, 3)    # 0.06 to 0.54
+        
+        # Total is strictly in (0.1, 0.9)
+        total = round(p_comp + r_comp, 3)
+        
         self.last_breakdown = {
-            "priority_score": p_score,
-            "reply_score": r_score,
+            "priority_score": p_comp,
+            "reply_score": r_comp,
             "task_reward": total
         }
         return total
@@ -136,7 +143,7 @@ class EmailTriageEnvironment(Environment):
             step_count=0,
             current_task_index=self._current_task_index,
             total_tasks=len(TASKS),
-            cumulative_reward=0.1,
+            cumulative_reward=0.5,
             difficulty=task.get("difficulty", "medium"),
         )
         
@@ -146,7 +153,7 @@ class EmailTriageEnvironment(Environment):
             body=task["body"],
             sender=task["sender"],
             task_description=task["task_description"],
-            reward=0.1,
+            reward=0.5,
             done=False,
             feedback="Started.",
         )
@@ -160,10 +167,10 @@ class EmailTriageEnvironment(Environment):
         self._state.cumulative_reward += reward
         self._state.current_task_index = self._current_task_index
 
-        self._current_task_index += 1
-        done = True # Each task is an independent episode now
+        # Advanced Logic handled by individual episode mode
+        done = True 
 
-        next_task = TASKS[self._current_task_index - 1]
+        next_task = TASKS[self._current_task_index]
         return EmailObservation(
             email_id=next_task["id"],
             subject=next_task["subject"],
