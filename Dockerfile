@@ -1,6 +1,5 @@
-FROM python:3.11-slim
+FROM python:3.10-slim
 
-# Set working directory
 WORKDIR /app
 
 # Install system dependencies
@@ -9,21 +8,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first for layer caching
-COPY server/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Install uv for fast, reliable dependency management
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Copy application code
-COPY models.py ./models.py
-COPY server/ ./server/
+# Copy the dependency files first (better caching)
+COPY pyproject.toml uv.lock ./
 
-# Expose port
+# Install dependencies using the system-wide python
+# This ensures all our requirements from pyproject.toml are met
+RUN uv pip install --system .
+
+# Copy the rest of the application
+COPY . .
+
+# Ensure the root is in the python path
+ENV PYTHONPATH=/app
+
+# Expose the default OpenEnv/Gradio port
 EXPOSE 7860
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:7860/health || exit 1
-
-# Run the server
-# HF Spaces uses port 7860 by default
-CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "2"]
+# Run the server via our standardized main() entry point
+CMD ["python", "-m", "server.app"]
