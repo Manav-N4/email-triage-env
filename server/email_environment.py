@@ -57,23 +57,23 @@ TASK_BY_ID = {t["id"]: t for t in TASKS}
 
 def _grade(action: EmailAction, task: dict) -> float:
     """
-    Returns a reward between 0.1 and 0.4.
-    Neutral Start (0.5) + Step (0.1..0.4) = Episode Total (0.6..0.9).
+    Returns a reward between 0.1 and 0.3.
+    Neutral Start (0.5) + Step (0.1..0.3) = Episode Total (0.6..0.8).
     """
-    # 1. Priority (Max 0.15, Min 0.05)
+    # 1. Priority (Max 0.1, Min 0.05)
     chosen = action.priority.strip().lower()
-    p_score = 0.15 if chosen == task["correct_priority"] else 0.05
+    p_score = 0.10 if chosen == task["correct_priority"] else 0.05
     
-    # 2. Reply (Max 0.25, Min 0.05)
-    r_score = 0.25 if not task["requires_reply"] else 0.05
+    # 2. Reply (Max 0.2, Min 0.05)
+    r_score = 0.20 if not task["requires_reply"] else 0.05
     if task["requires_reply"]:
         draft = (action.reply_draft or "").strip()
         if draft:
             keywords = task["keywords"]
             matched = sum(1 for kw in keywords if kw.lower() in draft.lower())
             ratio = matched / max(len(keywords), 1)
-            # Map [0, 1] to [0.05, 0.25]
-            r_score = 0.05 + (ratio * 0.20)
+            # Map [0, 1] to [0.05, 0.20]
+            r_score = 0.05 + (ratio * 0.15)
     
     return round(p_score + r_score, 3)
 
