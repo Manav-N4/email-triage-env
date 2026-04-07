@@ -1,6 +1,5 @@
 """
 Type definitions for the Email Triage environment.
-All defaults set to 0.1 to satisfy strict (0, 1) range but not 'game' with high defaults.
 """
 
 from typing import Optional, Dict, Any, List
@@ -16,7 +15,7 @@ class EmailState(BaseModel):
     step_count: int = 0
     current_task_index: int = 0
     total_tasks: int = 3
-    cumulative_reward: float = 0.1  # Non-zero default
+    cumulative_reward: float = 0.0
     difficulty: str = "easy"
 
 
@@ -31,7 +30,7 @@ class EmailObservation(BaseModel):
     task_description: str
     
     # These fields are required by OpenEnv's observer
-    reward: float = 0.1        # Non-zero default
+    reward: float = 0.0        # MUST be zero on reset to avoid inflating task score
     done: bool = False
     feedback: str = ""
     score_breakdown: Dict[str, Any] = Field(default_factory=dict)
