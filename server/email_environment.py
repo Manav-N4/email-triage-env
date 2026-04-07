@@ -105,8 +105,8 @@ TASK_BY_ID = {t["id"]: t for t in TASKS}
 # ---------------------------------------------------------------------------
 
 def _safe(value: float) -> float:
-    """Clamp to [0.01, 0.99] — the single place that enforces the open interval."""
-    return round(max(0.01, min(0.99, value)), 4)
+    """Clamp to [0.01, 0.90] — ensure sum never hits 1.0."""
+    return round(max(0.01, min(0.90, value)), 4)
 
 
 def _grade(action: EmailAction, task: dict) -> float:
