@@ -131,12 +131,11 @@ class EmailTriageEnvironment(Environment):
         self._current_task_index: int = 0
 
     def reset(self, task_id: Optional[str] = None, **kwargs) -> EmailObservation:
+        found_idx = 0
         if task_id:
             found_idx = next((i for i, t in enumerate(TASKS) if t["id"] == task_id), 0)
-            self._current_task_index = found_idx
-        else:
-            self._current_task_index = 0
-
+        
+        self._current_task_index = found_idx
         task = TASKS[self._current_task_index]
         self._state = EmailState(
             episode_id=str(uuid.uuid4()),
@@ -159,24 +158,26 @@ class EmailTriageEnvironment(Environment):
         )
 
     def step(self, action: EmailAction) -> EmailObservation:
+        # 1. Grade the CURRENT task index
+        task = TASKS[self._current_task_index]
         grader = self.rubric[self._current_task_index]
         reward = grader(action, None)
         breakdown = getattr(grader, "last_breakdown", {"task_reward": reward})
         
+        # 2. Update environment state
         self._state.step_count += 1
         self._state.cumulative_reward += reward
-        self._state.current_task_index = self._current_task_index
 
-        # Advanced Logic handled by individual episode mode
-        done = True 
+        # 3. Always mark as 'done' for individual task episodes
+        # This allows each task to be an independent [START]/[END] pair.
+        done = True
 
-        next_task = TASKS[self._current_task_index]
         return EmailObservation(
-            email_id=next_task["id"],
-            subject=next_task["subject"],
-            body=next_task["body"],
-            sender=next_task["sender"],
-            task_description=next_task["task_description"],
+            email_id=task["id"],
+            subject=task["subject"],
+            body=task["body"],
+            sender=task["sender"],
+            task_description=task["task_description"],
             reward=reward,
             done=done,
             feedback=f"Grade: {reward:.3f}",
