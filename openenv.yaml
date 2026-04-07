@@ -28,7 +28,7 @@ tasks:
     description: >
       Classify a clearly urgent internal incident alert email.
       No reply required. Tests baseline priority recognition.
-    reward_range: [0.01, 0.99]
+    reward_range: [0.0, 1.0]
 
   - id: task-medium
     name: "Client Complaint Response"
@@ -37,7 +37,7 @@ tasks:
       Classify a frustrated Enterprise client email as urgent and draft
       a professional, empathetic reply that acknowledges the issue,
       apologises, and commits to concrete follow-up action.
-    reward_range: [0.01, 0.99]
+    reward_range: [0.0, 1.0]
 
   - id: task-hard
     name: "Board-level Escalation"
@@ -46,7 +46,7 @@ tasks:
       Handle a board member raising multiple strategic concerns before a
       meeting. Must address all 3 concerns individually, maintain an
       executive tone, propose a meeting time, and avoid over-promising.
-    reward_range: [0.01, 0.99]
+    reward_range: [0.0, 1.0]
 
 observation_space:
   type: object
@@ -75,7 +75,7 @@ action_space:
       description: "Optional chain-of-thought (not scored)"
 
 reward:
-  range: [0.01, 0.99]
+  range: [0.0, 1.0]
   components:
     - name: priority_score
       weight: 0.4
