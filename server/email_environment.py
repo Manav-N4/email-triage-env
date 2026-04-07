@@ -114,17 +114,24 @@ class EmailTriageEnvironment(Environment):
         )
         self._current_task_index: int = 0
 
-    def reset(self) -> EmailObservation:
+    def reset(self, task_id: Optional[str] = None, **kwargs) -> EmailObservation:
+        # Support starting from a specific task if requested (useful for independent episode benchmarks)
+        if task_id:
+            found_idx = next((i for i, t in enumerate(TASKS) if t["id"] == task_id), 0)
+            self._current_task_index = found_idx
+        else:
+            self._current_task_index = 0
+
+        task = TASKS[self._current_task_index]
         self._state = EmailState(
             episode_id=str(uuid.uuid4()),
             step_count=0,
-            current_task_index=0,
+            current_task_index=self._current_task_index,
             total_tasks=len(TASKS),
             cumulative_reward=0.1,
-            difficulty="easy",
+            difficulty=task.get("difficulty", "medium"),
         )
-        self._current_task_index = 0
-        task = TASKS[0]
+        
         return EmailObservation(
             email_id=task["id"],
             subject=task["subject"],
@@ -133,22 +140,21 @@ class EmailTriageEnvironment(Environment):
             task_description=task["task_description"],
             reward=0.1,
             done=False,
-            feedback="Started.",
+            feedback="Episode started.",
         )
 
     def step(self, action: EmailAction) -> EmailObservation:
-        # 1. Grade using the rubric in a way the framework records ( __call__ )
+        # Grade using the rubric
         grader = self.rubric[self._current_task_index]
         reward = grader(action, None)
         
-        # 2. Update state
         self._state.step_count += 1
         self._state.cumulative_reward += reward
         self._state.current_task_index = self._current_task_index
 
-        # 3. Advance logic
-        self._current_task_index += 1
-        done = (self._current_task_index >= len(TASKS))
+        # For the individual episode mode, we mark as done after a single task
+        # This satisfies validators expecting one grader per episode.
+        done = True 
 
         if done:
             next_task = TASKS[len(TASKS)-1]

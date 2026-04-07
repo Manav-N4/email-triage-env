@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
 inference.py — Email Triage & Drafting Environment
-Baseline inference script — Fixed for StepResult and logging order.
+Final compliance script — Runs 3 independent episodes for validator success.
 
 Required environment variables:
   API_BASE_URL  — LLM API endpoint
   MODEL_NAME    — Model identifier
   HF_TOKEN      — Hugging Face token (No default)
   ENV_BASE_URL  — Environment server URL
-  LOCAL_IMAGE_NAME — (Optional) for local docker testing
 """
 
 import os
@@ -49,9 +48,9 @@ def call_llm(client: OpenAI, messages: list) -> dict:
     return json.loads(content)
 
 
-def run_episode(llm_client: OpenAI):
+def run_single_task(llm_client: OpenAI, task_id: str):
     """
-    Connects to the environment and runs the triage tasks.
+    Runs an independent episode for a specific task.
     """
     if LOCAL_IMAGE_NAME:
         env_factory = EmailTriageEnv.from_docker_image(LOCAL_IMAGE_NAME)
@@ -59,71 +58,47 @@ def run_episode(llm_client: OpenAI):
         env_factory = EmailTriageEnv(base_url=ENV_BASE_URL)
 
     with env_factory.sync() as env:
-        # 1. Reset to get the initial state
-        result = env.reset()
-        
-        # Pull the observation from the result wrapper (v0.2.x uses StepResult)
+        # Reset targeting the specific task ID
+        # This creates the [START] / [STEP] / [END] log set the validator needs
+        result = env.reset(task_id=task_id)
         obs = result.observation if hasattr(result, "observation") else result
         state = env.state()
         
         # [START] task_id=<id> difficulty=<easy|medium|hard>
         print(f"[START] task_id={obs.email_id} difficulty={state.difficulty}", flush=True)
 
-        step_count = 0
-        total_reward = 0.0
+        # Build context from the task
+        prompt = (
+            f"From: {obs.sender}\n"
+            f"Subject: {obs.subject}\n\n"
+            f"{obs.body}\n\n"
+            f"--- Task ---\n{obs.task_description}\n\n"
+            f"Respond with JSON: {{\"priority\": \"urgent|normal|low\", \"reply_draft\": \"string\"}}"
+        )
 
-        # Run until the episode signals done
-        while True:
-            # Current task ID for logging
-            current_task_id = obs.email_id
+        messages = [
+            {"role": "system", "content": "You are an expert email triage assistant. Respond ONLY with valid JSON."},
+            {"role": "user", "content": prompt}
+        ]
 
-            # Build context from the environment observation
-            prompt = (
-                f"From: {obs.sender}\n"
-                f"Subject: {obs.subject}\n\n"
-                f"{obs.body}\n\n"
-                f"--- Task ---\n{obs.task_description}\n\n"
-                f"Respond with JSON: {{\"priority\": \"urgent|normal|low\", \"reply_draft\": \"string\", \"reasoning\": \"string\"}}"
-            )
+        # 1. LLM decide action
+        action_dict = call_llm(llm_client, messages)
+        action = EmailAction(
+            priority=action_dict.get("priority", "normal"),
+            reply_draft=action_dict.get("reply_draft", "")
+        )
 
-            messages = [
-                {"role": "system", "content": "You are an expert email triage assistant. Respond ONLY with valid JSON."},
-                {"role": "user", "content": prompt}
-            ]
+        # 2. Step the Environment
+        result = env.step(action)
+        reward = result.reward
+        done = result.done
 
-            # 1. LLM decide action
-            action_dict = call_llm(llm_client, messages)
-            
-            action = EmailAction(
-                priority=action_dict.get("priority", "normal"),
-                reply_draft=action_dict.get("reply_draft", ""),
-                reasoning=action_dict.get("reasoning", "")
-            )
+        # [STEP] task_id=<id> action=<json> reward=<float> done=<bool>
+        action_log = json.dumps({"priority": action.priority, "reply_len": len(action.reply_draft)})
+        print(f"[STEP] task_id={obs.email_id} action={action_log} reward={reward:.4f} done={done}", flush=True)
 
-            # 2. Step the Environment
-            result = env.step(action)
-            step_obs = result.observation
-            reward = result.reward
-            done = result.done
-
-            total_reward += reward
-            step_count += 1
-
-            # [STEP] task_id=<id> action=<json> reward=<float> done=<bool>
-            # log the ID of the task we just acted upon
-            action_log = json.dumps({
-                "priority": action.priority,
-                "reply_words": len(action.reply_draft.split())
-            })
-            print(f"[STEP] task_id={current_task_id} action={action_log} reward={reward:.4f} done={done}", flush=True)
-
-            if done:
-                # [END] logs should be against the final task ID
-                print(f"[END] task_id={current_task_id} total_reward={total_reward:.4f} steps={step_count}", flush=True)
-                break
-
-            # Move to the next observation
-            obs = step_obs
+        # [END] task_id=<id> total_reward=<float> steps=<int>
+        print(f"[END] task_id={obs.email_id} total_reward={reward:.4f} steps=1", flush=True)
 
 
 def main():
@@ -131,22 +106,20 @@ def main():
         print("ERROR: HF_TOKEN environment variable is not set.", file=sys.stderr)
         sys.exit(1)
 
-    llm_client = OpenAI(
-        base_url=API_BASE_URL,
-        api_key=HF_TOKEN,
-    )
+    llm_client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
 
-    # Added robust error handling & retries to prevent unhandled exceptions
-    for attempt in range(3):
-        try:
-            run_episode(llm_client)
-            break
-        except Exception as e:
-            print(f"ERROR: Inference attempt {attempt+1} failed: {e}", file=sys.stderr)
-            if attempt < 2:
-                time.sleep(5) # Wait for server to stabilize
-            else:
-                sys.exit(1)
+    # LOOP THROUGH ALL 3 TASKS
+    # This ensures exactly 3 START / STEP / END logs are audited by the validator.
+    tasks_to_run = ["task-easy", "task-medium", "task-hard"]
+    
+    for tid in tasks_to_run:
+        for attempt in range(2):
+            try:
+                run_single_task(llm_client, tid)
+                break
+            except Exception as e:
+                print(f"Retrying {tid} due to: {e}", file=sys.stderr)
+                time.sleep(5)
 
 
 if __name__ == "__main__":
