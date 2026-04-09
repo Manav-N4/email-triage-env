@@ -37,6 +37,11 @@ reward:
   range: [0.01, 0.99]
   components:
     - name: priority_score
-      weight: 0.4
+      weight: 0.7
+      range: [0.01, 0.99]
     - name: reply_score
-      weight: 0.6
+      weight: 0.2
+      range: [0.01, 0.99]
+    - name: reasoning_score
+      weight: 0.1
+      range: [0.01, 0.99]

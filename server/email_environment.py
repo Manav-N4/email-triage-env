@@ -113,7 +113,7 @@ class EmailTriageEnvironment(Environment):
             sender=task["sender"], task_description=task["task_description"],
             reward=reward, done=True, feedback=f"Task complete. Score: {reward:.4f}",
             score_breakdown={
-                "priority_match": priority_raw,
+                "priority_score": priority_raw,
                 "reasoning_score": reasoning_raw,
                 "reply_score": reply_raw,
                 "final_mapped": reward
