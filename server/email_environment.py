@@ -83,27 +83,27 @@ class EmailTriageEnvironment(Environment):
     def step(self, action: EmailAction) -> EmailObservation:
         task = self._current_task
         
-        # 1. Dynamic Grading logic
-        # Helper to keep any score strictly in (0.01, 0.99)
+        # 1. Ultra-Safe Constants (Strictly within (0, 1))
+        S_ZERO = 0.01
+        S_ONE  = 0.99
+        
         def to_safe(s: float) -> float:
-            return max(0.01, min(0.99, s))
+            return max(S_ZERO, min(S_ONE, s))
 
-        # Check priority (70% weight)
-        priority_raw = 1.0 if action.priority.strip().lower() == task["correct_priority"].lower() else 0.0
+        # 2. Dynamic Grading logic - sourced directly from safe values
+        priority_raw = S_ONE if action.priority.strip().lower() == task["correct_priority"].lower() else S_ZERO
         
-        # Check reasoning (10% weight)
-        reasoning_raw = 1.0 if len(action.reasoning.strip()) > 10 else 0.0
+        reasoning_raw = S_ONE if len(action.reasoning.strip()) > 10 else S_ZERO
         
-        # Check reply draft (20% weight)
-        reply_raw = 1.0
+        reply_raw = S_ONE
         if task.get("task_description") in ["Reply.", "Address concerns."]:
-            reply_raw = 1.0 if len(action.reply_draft.strip()) > 20 else 0.0
+            reply_raw = S_ONE if len(action.reply_draft.strip()) > 20 else S_ZERO
             
+        # Weighted average of safe values is naturally safe
         raw_score = (priority_raw * 0.7) + (reasoning_raw * 0.1) + (reply_raw * 0.2)
         
-        # 2. Final mapped reward strictly in (0.01, 0.99)
-        eps = 0.01
-        reward = to_safe(eps + (raw_score * (1.0 - 2.0 * eps)))
+        # 3. Final mapped reward
+        reward = to_safe(raw_score)
         
         self._state.step_count += 1
         self._state.cumulative_reward = reward
@@ -113,9 +113,9 @@ class EmailTriageEnvironment(Environment):
             sender=task["sender"], task_description=task["task_description"],
             reward=reward, done=True, feedback=f"Task complete. Score: {reward:.4f}",
             score_breakdown={
-                "priority_match": to_safe(priority_raw),
-                "reasoning_score": to_safe(reasoning_raw),
-                "reply_score": to_safe(reply_raw),
+                "priority_match": priority_raw,
+                "reasoning_score": reasoning_raw,
+                "reply_score": reply_raw,
                 "final_mapped": reward
             }
         )
