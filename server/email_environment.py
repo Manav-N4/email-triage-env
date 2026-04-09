@@ -83,40 +83,39 @@ class EmailTriageEnvironment(Environment):
     def step(self, action: EmailAction) -> EmailObservation:
         task = self._current_task
         
-        # 1. Dynamic Grading Logic
+        # 1. Dynamic Grading logic
+        # Helper to keep any score strictly in (0.01, 0.99)
+        def to_safe(s: float) -> float:
+            return max(0.01, min(0.99, s))
+
         # Check priority (70% weight)
-        priority_match = 1.0 if action.priority.strip().lower() == task["correct_priority"].lower() else 0.0
+        priority_raw = 1.0 if action.priority.strip().lower() == task["correct_priority"].lower() else 0.0
         
-        # Check reasoning presence (10% weight)
-        reasoning_score = 1.0 if len(action.reasoning.strip()) > 10 else 0.0
+        # Check reasoning (10% weight)
+        reasoning_raw = 1.0 if len(action.reasoning.strip()) > 10 else 0.0
         
-        # Check reply draft for applicable tasks (20% weight)
-        reply_score = 1.0
+        # Check reply draft (20% weight)
+        reply_raw = 1.0
         if task.get("task_description") in ["Reply.", "Address concerns."]:
-            reply_score = 1.0 if len(action.reply_draft.strip()) > 20 else 0.0
+            reply_raw = 1.0 if len(action.reply_draft.strip()) > 20 else 0.0
             
-        raw_score = (priority_match * 0.7) + (reasoning_score * 0.1) + (reply_score * 0.2)
+        raw_score = (priority_raw * 0.7) + (reasoning_raw * 0.1) + (reply_raw * 0.2)
         
-        # 2. Map strictly to (0.01, 0.99) internal value
+        # 2. Final mapped reward strictly in (0.01, 0.99)
         eps = 0.01
-        reward = eps + (raw_score * (1.0 - 2.0 * eps))
-        reward = max(eps, min(1.0 - eps, reward))
+        reward = to_safe(eps + (raw_score * (1.0 - 2.0 * eps)))
         
         self._state.step_count += 1
         self._state.cumulative_reward = reward
-        
-        # 3. Final safety for score_breakdown to avoid 0.0/1.0 in JSON payload
-        safe_zero = 0.01
-        safe_one = 0.99
         
         return EmailObservation(
             email_id=task["id"], subject=task["subject"], body=task["body"],
             sender=task["sender"], task_description=task["task_description"],
             reward=reward, done=True, feedback=f"Task complete. Score: {reward:.4f}",
             score_breakdown={
-                "priority_match": safe_one if priority_match == 1.0 else safe_zero,
-                "reasoning_score": safe_one if reasoning_score == 1.0 else safe_zero,
-                "reply_score": safe_one if reply_score == 1.0 else safe_zero,
+                "priority_match": to_safe(priority_raw),
+                "reasoning_score": to_safe(reasoning_raw),
+                "reply_score": to_safe(reply_raw),
                 "final_mapped": reward
             }
         )
