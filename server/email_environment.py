@@ -63,37 +63,58 @@ class EmailTriageEnvironment(Environment):
         self._current_task = TASK_BY_ID.get(task_id, TASKS[0])
         task = self._current_task
         
-        # 0.33 is strictly between 0 and 1
+        # Start with a minimal epsilon reward to stay strictly > 0
+        eps = 0.01
         self._state = EmailState(
             episode_id=str(uuid.uuid4()),
             step_count=0,
             current_task_index=TASKS.index(task),
             total_tasks=len(TASKS),
-            cumulative_reward=0.33,
+            cumulative_reward=eps,
             difficulty=task["difficulty"],
         )
         return EmailObservation(
             email_id=task["id"], subject=task["subject"], body=task["body"],
             sender=task["sender"], task_description=task["task_description"],
-            reward=0.33, done=False, feedback="Started.",
-            score_breakdown={"base_score": 0.33}
+            reward=eps, done=False, feedback="Task initialized.",
+            score_breakdown={"init_eps": eps}
         )
 
     def step(self, action: EmailAction) -> EmailObservation:
         task = self._current_task
         
-        # Fixed 0.33 for action reward 
-        # Total Sum = 0.33 + 0.33 = 0.66 (Safe!)
-        reward = 0.33
+        # 1. Dynamic Grading Logic
+        # Check priority (70% weight)
+        priority_match = 1.0 if action.priority.strip().lower() == task["correct_priority"].lower() else 0.0
+        
+        # Check reasoning presence (10% weight)
+        reasoning_score = 1.0 if len(action.reasoning.strip()) > 10 else 0.0
+        
+        # Check reply draft for applicable tasks (20% weight)
+        reply_score = 1.0
+        if task.get("task_description") in ["Reply.", "Address concerns."]:
+            reply_score = 1.0 if len(action.reply_draft.strip()) > 20 else 0.0
+            
+        raw_score = (priority_match * 0.7) + (reasoning_score * 0.1) + (reply_score * 0.2)
+        
+        # 2. Map strictly to (0.01, 0.99) to avoid 1.00/0.00 rounding in 2-decimal logs
+        eps = 0.01
+        reward = eps + (raw_score * (1.0 - 2.0 * eps))
+        reward = round(reward, 2)
         
         self._state.step_count += 1
-        self._state.cumulative_reward = 0.66
+        self._state.cumulative_reward = reward
         
         return EmailObservation(
             email_id=task["id"], subject=task["subject"], body=task["body"],
             sender=task["sender"], task_description=task["task_description"],
-            reward=reward, done=True, feedback=f"Graded: {reward}",
-            score_breakdown={"action_score": 0.33, "total": 0.66}
+            reward=reward, done=True, feedback=f"Task complete. Score: {reward}",
+            score_breakdown={
+                "priority_match": priority_match,
+                "reasoning_score": reasoning_score,
+                "reply_score": reply_score,
+                "final_mapped": reward
+            }
         )
 
     @property

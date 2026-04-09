@@ -24,7 +24,7 @@ class EmailObservation(BaseModel):
     task_description: str = ""
     
     # Strictly between 0 and 1
-    reward: float = Field(default=0.33)
+    reward: float = Field(default=0.01)
     done: bool = False
     feedback: str = ""
     score_breakdown: Dict[str, Any] = Field(default_factory=dict)
@@ -36,5 +36,5 @@ class EmailState(State):
     """
     current_task_index: int = 0
     total_tasks: int = 3
-    cumulative_reward: float = 0.33
+    cumulative_reward: float = 0.01
     difficulty: str = "medium"
