@@ -97,10 +97,10 @@ class EmailTriageEnvironment(Environment):
             
         raw_score = (priority_match * 0.7) + (reasoning_score * 0.1) + (reply_score * 0.2)
         
-        # 2. Map strictly to (0.01, 0.99) to avoid 1.00/0.00 rounding in 2-decimal logs
+        # 2. Map strictly to (0.01, 0.99) internal value
         eps = 0.01
         reward = eps + (raw_score * (1.0 - 2.0 * eps))
-        reward = round(reward, 2)
+        reward = max(eps, min(1.0 - eps, reward))
         
         self._state.step_count += 1
         self._state.cumulative_reward = reward
@@ -108,7 +108,7 @@ class EmailTriageEnvironment(Environment):
         return EmailObservation(
             email_id=task["id"], subject=task["subject"], body=task["body"],
             sender=task["sender"], task_description=task["task_description"],
-            reward=reward, done=True, feedback=f"Task complete. Score: {reward}",
+            reward=reward, done=True, feedback=f"Task complete. Score: {reward:.4f}",
             score_breakdown={
                 "priority_match": priority_match,
                 "reasoning_score": reasoning_score,
