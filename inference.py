@@ -32,9 +32,9 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
     done_val = str(done).lower()
     print(f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}", flush=True)
 
-def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+def log_end(success: bool, steps: int, rewards: List[float]) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
+    print(f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}", flush=True)
 
 # ---------------------------------------------------------------------------
 # LLM Logic
@@ -62,45 +62,54 @@ def run_task(llm_client: OpenAI, task_id: str) -> None:
     
     rewards = []
     success = False
+    cur_step = 0
     
     try:
         with EmailTriageEnv(base_url=ENV_BASE_URL).sync() as env:
             # 1. Reset
-            reset_res = env.reset(task_id=task_id)
-            obs = reset_res.observation if hasattr(reset_res, "observation") else reset_res
+            obs = env.reset(task_id=task_id)
+            if hasattr(obs, "observation"):
+                obs = obs.observation
             
-            # 2. Build Context
-            context = f"From: {obs.sender}\nSubj: {obs.subject}\n\n{obs.body}\n\nTask: {obs.task_description}"
+            done = False
+            while not done:
+                cur_step += 1
+                # 2. Build Context
+                context = f"From: {obs.sender}\nSubj: {obs.subject}\n\n{obs.body}\n\nTask: {obs.task_description}"
+                
+                # 3. Action
+                action_dict = call_llm(llm_client, context)
+                action = EmailAction(
+                    priority=action_dict.get("priority", "normal"),
+                    reply_draft=action_dict.get("reply_draft", ""),
+                    reasoning=action_dict.get("reasoning", "")
+                )
+                
+                # 4. Step
+                step_res = env.step(action)
+                reward = step_res.reward
+                done = step_res.done
+                obs = step_res.observation if hasattr(step_res, "observation") else obs
+                
+                rewards.append(reward)
+                
+                # Format action for log (quoted arguments)
+                action_str = f'classify("{action.priority}")'
+                
+                log_step(step=cur_step, action=action_str, reward=reward, done=done, error=None)
+                
+                # Success usually defined by last reward or cumulative
+                success = reward >= 0.1
+                
+                if cur_step > 10: # Safety break
+                    break
             
-            # 3. Action
-            action_dict = call_llm(llm_client, context)
-            action = EmailAction(
-                priority=action_dict.get("priority", "normal"),
-                reply_draft=action_dict.get("reply_draft", ""),
-                reasoning=action_dict.get("reasoning", "")
-            )
-            
-            # 4. Step
-            step_res = env.step(action)
-            reward = step_res.reward
-            done = step_res.done
-            
-            rewards.append(reward)
-            
-            # Format action for log (no spaces allowed in key-value)
-            action_str = f"classify({action.priority})"
-            
-            log_step(step=1, action=action_str, reward=reward, done=done, error=None)
-            
-            # In our 1-step episodes, score = reward
-            score = reward
-            success = score >= 0.1 # Threshold from sample
-            
-            log_end(success=success, steps=1, score=score, rewards=rewards)
+        # [END] must be emitted AFTER env.close()
+        log_end(success=success, steps=cur_step, rewards=rewards)
 
     except Exception as e:
         # Minimum valid [END] log even on failure
-        log_end(success=False, steps=0, score=0.33, rewards=[0.33])
+        log_end(success=False, steps=cur_step, rewards=rewards)
         print(f"[DEBUG] Task {task_id} failed: {e}", file=sys.stderr)
 
 
