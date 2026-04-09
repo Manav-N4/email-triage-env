@@ -52,7 +52,7 @@ class EmailTriageEnv(EnvClient[EmailAction, EmailObservation, EmailState]):
             body=obs_data.get("body", ""),
             sender=obs_data.get("sender", ""),
             task_description=obs_data.get("task_description", ""),
-            reward=obs_data.get("reward", payload.get("reward", 0.0)),
+            reward=obs_data.get("reward", payload.get("reward", 0.01)),
             done=obs_data.get("done", payload.get("done", False)),
             feedback=obs_data.get("feedback", ""),
             score_breakdown=obs_data.get("score_breakdown", {}),
@@ -69,6 +69,6 @@ class EmailTriageEnv(EnvClient[EmailAction, EmailObservation, EmailState]):
             step_count=payload.get("step_count", 0),
             current_task_index=payload.get("current_task_index", 0),
             total_tasks=payload.get("total_tasks", 3),
-            cumulative_reward=payload.get("cumulative_reward", 0.0),
+            cumulative_reward=payload.get("cumulative_reward", 0.01),
             difficulty=payload.get("difficulty", "easy"),
         )

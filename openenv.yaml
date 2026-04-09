@@ -19,13 +19,13 @@ tasks:
     name: "Incident Classification (Easy)"
     difficulty: easy
     description: "Classify a high-priority server outage alert."
-    reward_range: [0.0, 1.0]
+    reward_range: [0.01, 0.99]
 
   - id: email-002
     name: "Client Escalation (Medium)"
     difficulty: medium
     description: "Classify and draft an empathetic reply to a frustrated client."
-    reward_range: [0.0, 1.0]
+    reward_range: [0.01, 0.99]
 
   - id: email-003
     name: "Strategic Board Mail (Hard)"
@@ -34,7 +34,7 @@ tasks:
     reward_range: [0.0, 1.0]
 
 reward:
-  range: [0.0, 1.0]
+  range: [0.01, 0.99]
   components:
     - name: priority_score
       weight: 0.4
