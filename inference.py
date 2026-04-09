@@ -32,9 +32,9 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
     done_val = str(done).lower()
     print(f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}", flush=True)
 
-def log_end(success: bool, steps: int, rewards: List[float]) -> None:
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
     rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}", flush=True)
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}", flush=True)
 
 # ---------------------------------------------------------------------------
 # LLM Logic
@@ -105,11 +105,13 @@ def run_task(llm_client: OpenAI, task_id: str) -> None:
                     break
             
         # [END] must be emitted AFTER env.close()
-        log_end(success=success, steps=cur_step, rewards=rewards)
+        score = rewards[-1] if rewards else 0.01
+        log_end(success=success, steps=cur_step, score=score, rewards=rewards)
 
     except Exception as e:
         # Minimum valid [END] log even on failure
-        log_end(success=False, steps=cur_step, rewards=rewards)
+        score = rewards[-1] if rewards else 0.01
+        log_end(success=False, steps=cur_step, score=score, rewards=rewards)
         print(f"[DEBUG] Task {task_id} failed: {e}", file=sys.stderr)
 
 
