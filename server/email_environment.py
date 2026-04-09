@@ -105,14 +105,18 @@ class EmailTriageEnvironment(Environment):
         self._state.step_count += 1
         self._state.cumulative_reward = reward
         
+        # 3. Final safety for score_breakdown to avoid 0.0/1.0 in JSON payload
+        safe_zero = 0.01
+        safe_one = 0.99
+        
         return EmailObservation(
             email_id=task["id"], subject=task["subject"], body=task["body"],
             sender=task["sender"], task_description=task["task_description"],
             reward=reward, done=True, feedback=f"Task complete. Score: {reward:.4f}",
             score_breakdown={
-                "priority_match": priority_match,
-                "reasoning_score": reasoning_score,
-                "reply_score": reply_score,
+                "priority_match": safe_one if priority_match == 1.0 else safe_zero,
+                "reasoning_score": safe_one if reasoning_score == 1.0 else safe_zero,
+                "reply_score": safe_one if reply_score == 1.0 else safe_zero,
                 "final_mapped": reward
             }
         )
